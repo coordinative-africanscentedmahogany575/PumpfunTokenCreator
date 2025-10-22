@@ -1,0 +1,287 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>PumpLaunch Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; color: #111; }
+      h1 { margin: 0 0 12px; font-size: 20px; }
+      .row { display: flex; gap: 12px; align-items: center; }
+      input { padding: 6px 8px; font-size: 14px; }
+      button { padding: 6px 10px; font-size: 14px; cursor: pointer; }
+      table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+      th, td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
+      th { background: #f5f5f5; text-align: left; }
+      .muted { color: #666; }
+    </style>
+  </head>
+  <body>
+    <h1>PumpLaunch Dashboard</h1>
+    <div class="row">
+      <label>Mint:</label>
+      <input id="mint" size="50" placeholder="Token mint (optional; uses last created if empty)" />
+      <button id="saveMint">Save</button>
+      <button id="refresh">Refresh</button>
+    </div>
+    <hr />
+    <h2>Create Token</h2>
+    <div class="row">
+      <input id="c_name" placeholder="Name" />
+      <input id="c_symbol" placeholder="Symbol" />
+      <input id="c_description" placeholder="Description" size="40" />
+    </div>
+    <div class="row">
+      <input id="c_website" placeholder="Website" size="30" />
+      <input id="c_twitter" placeholder="Twitter" size="30" />
+      <input id="c_telegram" placeholder="Telegram" size="30" />
+    </div>
+    <div class="row">
+      <input id="c_image" type="file" accept="image/*" />
+      <input id="c_devBuySol" type="number" step="0.0001" placeholder="Dev Buy SOL (default 1)" />
+      <input id="c_slippage" type="number" step="1" placeholder="Slippage % (default 10)" />
+      <input id="c_priority" type="number" step="0.000001" placeholder="Priority Fee SOL (default 0.00001)" />
+      <button id="createBtn">Create + Dev Buy</button>
+    </div>
+
+    <hr />
+    <h2>Generate Wallets</h2>
+    <div class="row">
+      <input id="w_count" type="number" placeholder="Count" />
+      <input id="w_defaultBuySol" type="number" step="0.0001" placeholder="Default buy SOL (per wallet)" />
+      <input id="w_prefix" placeholder="Name prefix (buyer)" />
+      <button id="genWallets">Generate</button>
+    </div>
+
+    <hr />
+    <h2>Buy</h2>
+    <div class="row">
+      <input id="b_buySol" type="number" step="0.0001" placeholder="Override buy SOL (optional)" />
+      <input id="b_concurrency" type="number" placeholder="Concurrency (4)" />
+      <input id="b_slippage" type="number" step="1" placeholder="Slippage % (10)" />
+      <input id="b_priority" type="number" step="0.000001" placeholder="Priority Fee SOL (0.00001)" />
+      <button id="buyBtn">Buy</button>
+    </div>
+
+    <hr />
+    <h2>Sell</h2>
+    <div class="row">
+      <input id="s_tokens" type="number" step="0.000001" placeholder="Tokens per wallet" />
+      <span>or</span>
+      <input id="s_percent" type="number" step="1" placeholder="Percent per wallet" />
+      <input id="s_concurrency" type="number" placeholder="Concurrency (4)" />
+      <input id="s_slippage" type="number" step="1" placeholder="Slippage % (10)" />
+      <input id="s_priority" type="number" step="0.000001" placeholder="Priority Fee SOL (0.00001)" />
+      <button id="sellBtn">Sell</button>
+    </div>
+
+    <hr />
+    <h2>Collect Creator Fees</h2>
+    <div class="row">
+      <input id="cf_priority" type="number" step="0.000001" placeholder="Priority Fee SOL (0.00001)" />
+      <button id="collectBtn">Collect Fees</button>
+    </div>
+    <div class="row">
+      <span id="status" class="muted"></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Public Key</th>
+          <th>Role</th>
+          <th>SOL</th>
+          <th>Token</th>
+          <th>Buy SOL</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="row" style="margin-top: 8px;">
+      <button id="saveBuySol">Save Buy Amounts</button>
+    </div>
+    <script>
+      const elMint = document.getElementById('mint');
+      const elStatus = document.getElementById('status');
+      const elRows = document.getElementById('rows');
+      const elSaveMint = document.getElementById('saveMint');
+      const elRefresh = document.getElementById('refresh');
+      const elSaveBuySol = document.getElementById('saveBuySol');
+      // Create controls
+      const c_name = document.getElementById('c_name');
+      const c_symbol = document.getElementById('c_symbol');
+      const c_description = document.getElementById('c_description');
+      const c_website = document.getElementById('c_website');
+      const c_twitter = document.getElementById('c_twitter');
+      const c_telegram = document.getElementById('c_telegram');
+      const c_image = document.getElementById('c_image');
+      const c_devBuySol = document.getElementById('c_devBuySol');
+      const c_slippage = document.getElementById('c_slippage');
+      const c_priority = document.getElementById('c_priority');
+      const createBtn = document.getElementById('createBtn');
+      // Wallet gen controls
+      const w_count = document.getElementById('w_count');
+      const w_defaultBuySol = document.getElementById('w_defaultBuySol');
+      const w_prefix = document.getElementById('w_prefix');
+      const genWallets = document.getElementById('genWallets');
+      // Buy controls
+      const b_buySol = document.getElementById('b_buySol');
+      const b_concurrency = document.getElementById('b_concurrency');
+      const b_slippage = document.getElementById('b_slippage');
+      const b_priority = document.getElementById('b_priority');
+      const buyBtn = document.getElementById('buyBtn');
+      // Sell controls
+      const s_tokens = document.getElementById('s_tokens');
+      const s_percent = document.getElementById('s_percent');
+      const s_concurrency = document.getElementById('s_concurrency');
+      const s_slippage = document.getElementById('s_slippage');
+      const s_priority = document.getElementById('s_priority');
+      const sellBtn = document.getElementById('sellBtn');
+      // Collect fees
+      const cf_priority = document.getElementById('cf_priority');
+      const collectBtn = document.getElementById('collectBtn');
+
+      async function loadState() {
+        const s = await fetch('/api/state').then(r => r.json());
+        return s || {};
+      }
+
+      async function refresh() {
+        elStatus.textContent = 'Loading...';
+        const mint = elMint.value.trim();
+        const qs = mint ? ('?mint=' + encodeURIComponent(mint)) : '';
+        const data = await fetch('/api/balances' + qs).then(r => r.json()).catch(e => ({ error: String(e) }));
+        if (data.error) {
+          elStatus.textContent = 'Error: ' + data.error;
+          return;
+        }
+        if (!elMint.value && data.mint) elMint.value = data.mint;
+        elRows.innerHTML = '';
+        for (const row of data.data) {
+          const tr = document.createElement('tr');
+          const isBuyer = row.role === 'buyer';
+          const buySolInput = isBuyer ? `<input data-pk="${row.publicKey}" class="buySolInput" type="number" step="0.0001" value="${(row.buySol ?? '').toString()}" placeholder="per-wallet" />` : '';
+          tr.innerHTML = `
+            <td>${row.name || '-'}</td>
+            <td class="muted">${row.publicKey}</td>
+            <td>${row.role || ''}</td>
+            <td>${row.sol.toFixed(6)}</td>
+            <td>${row.token.toFixed(6)}</td>
+            <td>${buySolInput}</td>
+          `;
+          elRows.appendChild(tr);
+        }
+        elStatus.textContent = 'Updated ' + new Date().toLocaleTimeString();
+      }
+
+      elSaveMint.addEventListener('click', async () => {
+        const mint = elMint.value.trim();
+        await fetch('/api/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mint }) });
+        elStatus.textContent = 'Saved mint';
+      });
+      elRefresh.addEventListener('click', refresh);
+      createBtn.addEventListener('click', async () => {
+        try {
+          elStatus.textContent = 'Creating token...';
+          const fd = new FormData();
+          fd.append('name', c_name.value.trim());
+          fd.append('symbol', c_symbol.value.trim());
+          fd.append('description', c_description.value.trim());
+          if (c_website.value) fd.append('website', c_website.value.trim());
+          if (c_twitter.value) fd.append('twitter', c_twitter.value.trim());
+          if (c_telegram.value) fd.append('telegram', c_telegram.value.trim());
+          if (c_image.files && c_image.files[0]) fd.append('image', c_image.files[0]);
+          if (c_devBuySol.value) fd.append('devBuySol', c_devBuySol.value);
+          if (c_slippage.value) fd.append('slippage', c_slippage.value);
+          if (c_priority.value) fd.append('priorityFee', c_priority.value);
+          const resp = await fetch('/api/create', { method: 'POST', body: fd });
+          const json = await resp.json();
+          if (!resp.ok) throw new Error(json.error || 'Failed');
+          elMint.value = json.mint;
+          elStatus.textContent = 'Created. Mint: ' + json.mint + ' | tx: ' + json.signature;
+          refresh();
+        } catch (e) {
+          elStatus.textContent = 'Create error: ' + e.message;
+        }
+      });
+      genWallets.addEventListener('click', async () => {
+        try {
+          elStatus.textContent = 'Generating wallets...';
+          const body = { count: Number(w_count.value || 0) };
+          if (w_defaultBuySol.value) body.defaultBuySol = Number(w_defaultBuySol.value);
+          if (w_prefix.value) body.prefix = w_prefix.value.trim();
+          const resp = await fetch('/api/wallets/gen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const json = await resp.json();
+          if (!resp.ok) throw new Error(json.error || 'Failed');
+          elStatus.textContent = 'Generated ' + (json.added?.length || 0) + ' wallets';
+          refresh();
+        } catch (e) { elStatus.textContent = 'Generate error: ' + e.message; }
+      });
+      buyBtn.addEventListener('click', async () => {
+        try {
+          elStatus.textContent = 'Buying...';
+          const body = { mint: elMint.value.trim() };
+          if (b_buySol.value) body.buySol = Number(b_buySol.value);
+          if (b_concurrency.value) body.concurrency = Number(b_concurrency.value);
+          if (b_slippage.value) body.slippage = Number(b_slippage.value);
+          if (b_priority.value) body.priorityFee = Number(b_priority.value);
+          const resp = await fetch('/api/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const json = await resp.json();
+          if (!resp.ok) throw new Error(json.error || 'Failed');
+          const ok = (json.results || []).filter(r => r && r.ok).length;
+          const fail = (json.results || []).length - ok;
+          elStatus.textContent = `Buy done. Success: ${ok}, Fail: ${fail}`;
+          refresh();
+        } catch (e) { elStatus.textContent = 'Buy error: ' + e.message; }
+      });
+      sellBtn.addEventListener('click', async () => {
+        try {
+          elStatus.textContent = 'Selling...';
+          const body = { mint: elMint.value.trim() };
+          if (s_tokens.value) body.tokens = Number(s_tokens.value);
+          if (s_percent.value) body.percent = Number(s_percent.value);
+          if (s_concurrency.value) body.concurrency = Number(s_concurrency.value);
+          if (s_slippage.value) body.slippage = Number(s_slippage.value);
+          if (s_priority.value) body.priorityFee = Number(s_priority.value);
+          const resp = await fetch('/api/sell', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const json = await resp.json();
+          if (!resp.ok) throw new Error(json.error || 'Failed');
+          const ok = (json.results || []).filter(r => r && r.ok).length;
+          const fail = (json.results || []).length - ok;
+          elStatus.textContent = `Sell done. Success: ${ok}, Fail: ${fail}`;
+          refresh();
+        } catch (e) { elStatus.textContent = 'Sell error: ' + e.message; }
+      });
+      collectBtn.addEventListener('click', async () => {
+        try {
+          elStatus.textContent = 'Collecting fees...';
+          const body = {};
+          if (cf_priority.value) body.priorityFee = Number(cf_priority.value);
+          const resp = await fetch('/api/collect-fees', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const json = await resp.json();
+          if (!resp.ok) throw new Error(json.error || 'Failed');
+          elStatus.textContent = 'Collected. Signature: ' + json.signature;
+        } catch (e) { elStatus.textContent = 'Collect error: ' + e.message; }
+      });
+      loadState().then((s) => { if (s.mint) elMint.value = s.mint; refresh(); });
+      setInterval(refresh, 15000);
+    </script>
+  </body>
+  </html>
+      elSaveBuySol.addEventListener('click', async () => {
+        try {
+          const els = document.querySelectorAll('.buySolInput');
+          const updates = [];
+          els.forEach((el) => {
+            const pk = el.getAttribute('data-pk');
+            const val = el.value;
+            if (pk && val !== '') updates.push({ publicKey: pk, buySol: Number(val) });
+          });
+          if (!updates.length) { elStatus.textContent = 'No changes'; return; }
+          const resp = await fetch('/api/wallets/update-buy-amounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updates }) });
+          const json = await resp.json();
+          if (!resp.ok) throw new Error(json.error || 'Failed');
+          elStatus.textContent = 'Updated buy amounts';
+          refresh();
+        } catch (e) { elStatus.textContent = 'Save error: ' + e.message; }
+      });

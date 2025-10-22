@@ -1,0 +1,20 @@
+/* Tailwind directives are processed at build time by PostCSS.
+   If your editor flags these as unknown at‑rules, set
+   `css.lint.unknownAtRules` to `ignore` (VS Code) or configure
+   your CSS linter to recognize Tailwind. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { background-color: #0b1220; color: #e2e8f0; }
+
+/* Simple scrollbar for logs */
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+}
